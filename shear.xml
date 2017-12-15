@@ -1,0 +1,180 @@
+<?xml version="1.0"?>
+<CLBConfig version="2.0" output="output/">
+	<Units>
+		<Params M="10m" gauge="64"/>
+		<Params S="0.001s" gauge="1"/>
+		<Params KG="1kg/m3" gauge="1"/>
+	</Units>
+        <Geometry nx="10m" ny="10m" nz="10m">
+		<MRT><Box/></MRT>
+	</Geometry>
+	<Model>
+		<Params omega="1.0"/>
+		<RemoteForceInterface Iterations="100000" particle="RotSphere" verletDist="0.5" gridSpacing="2.5" periodic="x">
+from WallLoader import WallLoaderRunnable, ServoWallLoaderRunnable
+from math import pi
+
+i=0
+
+packer = RandomBoxPacker (
+    minRadius = 0.5,
+    maxRadius = 0.5,
+    cubicPackRadius = 1.1,
+    maxInsertFails = 1000,
+    bBox = BoundingBox(
+        Vec3(0.0, 1.0,0.0),
+        Vec3(10.0, 9.0, 10.0)
+    ),
+    circDimList = [True, False, False],
+    tolerance = 1.0e-5
+)
+packer.generate()
+particleList = packer.getSimpleSphereCollection()
+
+#then add the particles to the simulation object:
+for pp in particleList:
+    pp.setTag (1)
+    pp.setId(i)
+    i+=1
+    sim.createParticle(pp)
+
+cube = CubicBlock(dimCount=[10,11,1], radius=0.5)
+cube.rotate(Vec3(-pi/2,0,0),Vec3(0,0,0))
+cube.translate(Vec3(0.25,0.5,0.66))
+for pp in cube:
+    pp.setId(i)
+    pp.setRadius(0.4)
+    i+=1
+    pp.setTag(2)
+    sim.createParticle(pp)
+
+cube = CubicBlock(dimCount=[10,11,1], radius=0.5)
+cube.rotate(Vec3(-pi/2,0,0),Vec3(0,0,0))
+cube.translate(Vec3(0.25,10-0.5,0.66))
+for pp in cube:
+    pp.setId(i)
+    i+=1
+    pp.setRadius(0.4)
+    pp.setTag(3)
+    sim.createParticle(pp)
+
+sim.setParticleDensity(tag = 1, mask = -1, Density = 3.0)
+sim.setParticleDensity(tag = 2, mask = -1, Density = 3.0)
+sim.setParticleDensity(tag = 3, mask = -1, Density = 3.0)
+
+sim.setParticleNonRotational(2);
+sim.setParticleNonRotational(3);
+
+sim.createWall(
+    name="floor",
+    posn=Vec3(0,0,0),
+    normal=Vec3(0,1,0)
+)
+
+sim.createWall(
+    name="ceiling",
+    posn=Vec3(0,10,0),
+    normal=Vec3(0,-1,0)
+)
+
+sim.createWall(
+    name="wall_a",
+    posn=Vec3(0,0,0),
+    normal=Vec3(0,0,1)
+)
+
+sim.createWall(
+    name="wall_b",
+    posn=Vec3(0,0,10),
+    normal=Vec3(0,0,-1)
+)
+
+sim.createInteractionGroup (
+    NRotBondedWallPrms (
+        name = "floor_bonds",
+        wallName = "floor",
+        normalK = 10000.0,
+        particleTag = 2
+    )
+)
+sim.createInteractionGroup (
+    NRotBondedWallPrms (
+        name = "ceiling_bonds",
+        wallName = "ceiling",
+        normalK = 10000.0,
+        particleTag = 3
+    )
+)
+
+sim.createInteractionGroup(
+    NRotElasticWallPrms(
+        name = "elasticWall_a",
+        wallName = "wall_a",
+        normalK = 10000.0
+    )
+)
+sim.createInteractionGroup(
+    NRotElasticWallPrms(
+        name = "elasticWall_b",
+        wallName = "wall_b",
+        normalK = 10000.0
+    )
+)
+
+sim.createInteractionGroup (
+    RotFrictionPrms (
+        name = "friction",
+        normalK = 10000,
+        dynamicMu = 0.6,
+        shearK = 1000,
+        staticMu = 0.6,
+        scaling = True
+    )
+)
+
+wall_loader1 = WallLoaderRunnable(
+    LsmMpi = sim,
+    wallName = "floor",
+    vPlate = Vec3 (0.125, 0.0, 0.0),
+    startTime = 5000,
+    rampTime = 1000
+)
+sim.addPreTimeStepRunnable (wall_loader1)
+
+servo_loader1 = ServoWallLoaderRunnable(
+    LsmMpi = sim,
+    interactionName = "ceiling_bonds",
+    force = Vec3 (0.0, -1000.0, 0.0),
+    startTime = 0,
+    rampTime = 5000
+)
+sim.addPreTimeStepRunnable (servo_loader1)
+
+sim.createCheckPointer (
+    CheckPointPrms (
+        fileNamePrefix = "output/data_shear1",
+        beginTimeStep = 0,
+        endTimeStep = 100000,
+        timeStepIncr = 500
+    )
+)
+
+force_saver = WallVectorFieldSaverPrms(
+	wallName=["floor", "ceiling"],
+	fieldName="Force",
+	fileName="output/out_Force.dat",
+	fileFormat="RAW_SERIES",
+	beginTimeStep=0,
+	endTimeStep=100000,
+	timeStepIncr=1
+)
+sim.createFieldSaver(force_saver)
+
+sim.run()
+		</RemoteForceInterface>
+	</Model>
+	<Failcheck Iterations="1000"/>
+	<VTK what="U,Solid"/>
+	<VTK Iterations="500" what="U,Solid"/>
+	<Solve Iterations="100000"/>
+</CLBConfig>
