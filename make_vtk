@@ -1,0 +1,3 @@
+#!/bin/bash
+
+dump2vtk -i output/data_shear1 -o output/vtk_shear1 -t 0 1000 500 -rot >/dev/null
