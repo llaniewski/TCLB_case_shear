@@ -8,19 +8,14 @@
 #SBATCH -p gpu
 #SBATCH --gres=gpu:1
 
-# SBATCH -A director2047
 
-nvidia-smi
- 
+echo "---- INFO ---"
 hostname
-
+nvidia-smi
 which esysparticle
-echo $ESPATH
-echo $LD_LIBRARY_PATH
+echo "-------------"
 
-cd \$SLURM_SUBMIT_DIR 
+cd $SLURM_SUBMIT_DIR 
 
 module load mpi/openmpi-x86_64
 mpirun -np 1 -x LD_LIBRARY_PATH -x PATH -x PYTHONPATH ~/TCLB_part/CLB/d3q27_cumulant_part/main shear.xml
-
-
